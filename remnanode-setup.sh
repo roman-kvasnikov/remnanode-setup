@@ -1,89 +1,63 @@
-#!/bin/bash
+#!/usr/bin/env bash
+#
+# ╔══════════════════════════════════════════════════════════╗
+# ║     Ubuntu VPS Initial Setup — Remnanode Deployment      ║
+# ║                                                          ║
+# ║         Docker · Geo databases · Kernel tuning           ║
+# ╚══════════════════════════════════════════════════════════╝
+#
+
 set -euo pipefail
 
-SSH_PUBLIC_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID9RdgFuS9wCoBSJ/OpdGWBO1JNVVVbi32o2J/YO2uMC romank@master"
+# ── Colors & helpers ───────────────────────────────────────
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
 
-# Проверка запуска от root
-if [[ "$EUID" -ne 0 ]]; then
-    echo "Запускай от root: sudo bash setup-node.sh"
+step_current=0
+step_total=4
+
+info()  { echo -e "${CYAN}[INFO]${NC}  $1"; }
+ok()    { echo -e "${GREEN}[OK]${NC}    $1"; }
+warn()  { echo -e "${YELLOW}[WARN]${NC}  $1"; }
+error() { echo -e "${RED}[ERROR]${NC} $1"; }
+
+step() {
+    step_current=$((step_current + 1))
+    echo ""
+    echo -e "${BOLD}${CYAN}═══ [${step_current}/${step_total}] $1 ═══${NC}"
+}
+
+# ── Pre-flight checks ─────────────────────────────────────
+if [[ $EUID -ne 0 ]]; then
+    error "This script must be run as root (sudo bash $0)"
     exit 1
 fi
 
-echo "=== [1/8] Создание пользователя super ==="
-if id "super" &>/dev/null; then
-    echo "Пользователь super уже существует, пропускаю"
+echo ""
+echo -e "${BOLD}${GREEN}╔════════════════════════════════════════════╗${NC}"
+echo -e "${BOLD}${GREEN}║     Remnanode VPS Setup — Starting...      ║${NC}"
+echo -e "${BOLD}${GREEN}╚════════════════════════════════════════════╝${NC}"
+
+# ── Step 1: Docker ─────────────────────────────────────────
+step "Installing Docker"
+
+if command -v docker &>/dev/null; then
+    warn "Docker is already installed: $(docker --version)"
 else
-    useradd -m -s /bin/bash -G sudo super
-    echo "super:super" | chpasswd
-    echo "Пользователь super создан"
+    curl -fsSL https://get.docker.com | sh
+    ok "Docker installed: $(docker --version)"
 fi
 
-echo "=== [2/8] Настройка SSH ключа ==="
-mkdir -p /home/super/.ssh
-echo "$SSH_PUBLIC_KEY" > /home/super/.ssh/authorized_keys
-chmod 700 /home/super/.ssh
-chmod 600 /home/super/.ssh/authorized_keys
-chown -R super:super /home/super/.ssh
+# ── Step 2: Remnanode directory & compose ──────────────────
+step "Setting up Remnanode"
 
-echo "=== [3/8] Харденинг SSH ==="
-cat > /etc/ssh/sshd_config.d/00-hardening.conf << 'EOF'
-Port 12122
-LoginGraceTime 1m
-MaxAuthTries 5
-PermitRootLogin no
-PubkeyAuthentication yes
-PasswordAuthentication no
-PermitEmptyPasswords no
-KbdInteractiveAuthentication no
-AllowUsers super
-ClientAliveInterval 300
-ClientAliveCountMax 2
-EOF
-
-echo "=== [4/8] Установка Docker ==="
-curl -fsSL https://get.docker.com | sh
-echo "Docker установлен: $(docker --version)"
-
-echo "=== [5/8] Установка и настройка UFW ==="
-apt-get update -qq
-apt-get install -y -qq ufw
-
-ufw --force reset
-ufw default deny incoming
-ufw default allow outgoing
-
-ufw allow 12122/tcp	# SSH
-ufw allow 8443/tcp	# VLESS Reality XRAY
-ufw allow 443/tcp	# VLESS Reality XHTTP
-ufw allow 443/udp	# Hysteria2
-ufw allow 2053/tcp	# VLESS Reality XRAY
-ufw allow 2222/tcp	# Node management
-ufw allow 1234/tcp
-
-ufw --force enable
-echo "UFW активирован"
-
-echo "=== [6/8] Установка и настройка fail2ban ==="
-apt-get install -y -qq fail2ban
-
-cat > /etc/fail2ban/jail.local << 'EOF'
-[DEFAULT]
-bantime  = 10m
-findtime = 10m
-maxretry = 5
-
-[sshd]
-enabled = true
-port    = 12122
-logpath = %(sshd_log)s
-backend = %(sshd_backend)s
-EOF
-
-systemctl enable fail2ban
-systemctl restart fail2ban
-
-echo "=== [7/8] Подготовка Remnanode ==="
 mkdir -p /opt/remnanode
+info "Created /opt/remnanode"
+
 cat > /opt/remnanode/docker-compose.yml << 'EOF'
 services:
   remnanode:
@@ -102,13 +76,20 @@ services:
       - NODE_PORT=2222
       - SECRET_KEY=""
     volumes:
+      # - /dev/shm:/dev/shm:rw
       - ./geoip.dat:/usr/local/share/xray/geoip.dat:ro
       - ./geosite.dat:/usr/local/share/xray/geosite.dat:ro
       - ./ru-geoip.dat:/usr/local/share/xray/ru-geoip.dat:ro
       - ./ru-geosite.dat:/usr/local/share/xray/ru-geosite.dat:ro
+      # - ./certs/cert.crt:/etc/xray/certs/cert.crt:ro
+      # - ./certs/key.key:/etc/xray/certs/key.key:ro
 EOF
 
-echo "=== [8/8] Скрипт обновления геобаз + cron ==="
+ok "docker-compose.yml created"
+
+# ── Step 3: Geo database update script & cron ──────────────
+step "Configuring geo database updates"
+
 cat > /opt/remnanode/update-geo.sh << 'SCRIPT'
 #!/bin/bash
 
@@ -117,7 +98,7 @@ LOG_FILE="/var/log/xray-geo-update.log"
 
 echo "$(date): Starting geo update" >> "$LOG_FILE"
 
-# Скачиваем все файлы во временные
+# Download all files to temporary names first
 if wget -q -O "$GEO_DIR/geoip.dat.new" \
      https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat && \
    wget -q -O "$GEO_DIR/geosite.dat.new" \
@@ -127,7 +108,7 @@ if wget -q -O "$GEO_DIR/geoip.dat.new" \
    wget -q -O "$GEO_DIR/ru-geosite.dat.new" \
      https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geosite.dat; then
 
-  # Все скачалось — делаем атомарную замену
+  # All downloaded — atomic swap
   mv "$GEO_DIR/geoip.dat.new" "$GEO_DIR/geoip.dat"
   mv "$GEO_DIR/geosite.dat.new" "$GEO_DIR/geosite.dat"
   mv "$GEO_DIR/ru-geoip.dat.new" "$GEO_DIR/ru-geoip.dat"
@@ -136,38 +117,100 @@ if wget -q -O "$GEO_DIR/geoip.dat.new" \
   docker restart remnanode
   echo "$(date): Update successful, container restarted" >> "$LOG_FILE"
 else
-  # Что-то не скачалось — чистим временные файлы
+  # Download failed — clean up temp files
   rm -f "$GEO_DIR"/*.new
   echo "$(date): Download failed, no changes made" >> "$LOG_FILE"
 fi
 SCRIPT
 
 chmod +x /opt/remnanode/update-geo.sh
+ok "update-geo.sh created"
 
-# Добавляем в cron (каждый день в 4:00)
+# Add to cron (daily at 04:00)
 CRON_JOB="0 4 * * * /opt/remnanode/update-geo.sh"
 (crontab -l 2>/dev/null | grep -v "update-geo.sh"; echo "$CRON_JOB") | crontab -
+ok "Cron job added (daily at 04:00)"
 
-# Первый запуск геобаз
-echo "Скачиваю геобазы (первый запуск)..."
+# First run
+info "Downloading geo databases (initial run)..."
 /opt/remnanode/update-geo.sh
+ok "Geo databases downloaded"
 
-# Перезапуск SSH
-echo ""
-echo "=== Перезапускаю SSH ==="
-systemctl restart sshd
+# ── Step 4: Kernel tuning ─────────────────────────────────
+step "Applying kernel parameters"
 
+cat > /etc/sysctl.d/99-optimal-vless.conf << 'EOF'
+# ===== OPTIMAL VLESS SERVER CONFIG =====
+
+fs.file-max=2097152
+net.ipv4.tcp_window_scaling = 1
+net.ipv4.tcp_moderate_rcvbuf = 1
+
+# ---- Congestion Control (best for VLESS/YouTube) ----
+net.ipv4.tcp_congestion_control = bbr
+net.core.default_qdisc = fq
+
+# ---- 4MB TCP Buffers = stable up to ~500 Mbps ----
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.ipv4.tcp_rmem = 4096 262144 16777216
+net.ipv4.tcp_wmem = 4096 262144 16777216
+
+# ---- Fast Open ----
+net.ipv4.tcp_fastopen = 3
+
+# ---- Latency & stability improvements ----
+net.ipv4.tcp_slow_start_after_idle = 0
+# net.ipv4.tcp_notsent_lowat = 16384
+net.ipv4.tcp_mtu_probing = 2
+net.ipv4.tcp_ecn = 1
+
+# ---- TIME-WAIT (optimal for 5-10 VLESS clients) ----
+net.ipv4.tcp_max_tw_buckets = 20000
+
+# ---- Queues (best for 1 CPU, low jitter) ----
+net.core.somaxconn = 1024
+net.ipv4.tcp_max_syn_backlog = 2048
+net.core.netdev_max_backlog = 2000
+
+# ---- Keepalive for long VLESS connections ----
+net.ipv4.tcp_keepalive_time = 600
+net.ipv4.tcp_keepalive_probes = 3
+net.ipv4.tcp_keepalive_intvl = 30
+
+# ---- Security ----
+net.ipv4.tcp_syncookies = 1
+net.ipv4.conf.all.rp_filter = 1
+net.ipv4.conf.default.rp_filter = 1
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv4.conf.default.accept_redirects = 0
+net.ipv4.conf.all.send_redirects = 0
+net.ipv4.conf.default.send_redirects = 0
+net.ipv4.icmp_echo_ignore_broadcasts = 1
+net.ipv4.conf.all.log_martians = 0
+
+# ---- TCP advanced ----
+net.ipv4.tcp_timestamps = 1
+net.ipv4.tcp_sack = 1
+
+# ---- Memory tuning ----
+vm.swappiness = 10
+vm.vfs_cache_pressure = 50
+vm.max_map_count = 262144
+EOF
+
+sysctl --system > /dev/null 2>&1
+ok "Kernel parameters applied"
+
+# ── Summary ────────────────────────────────────────────────
 echo ""
-echo "============================================"
-echo "  ГОТОВО! Сервер настроен."
-echo "============================================"
+echo -e "${BOLD}${GREEN}╔════════════════════════════════════════════╗${NC}"
+echo -e "${BOLD}${GREEN}║           Setup complete!                   ║${NC}"
+echo -e "${BOLD}${GREEN}╚════════════════════════════════════════════╝${NC}"
 echo ""
-echo "  Пользователь:   super"
-echo "  SSH порт:       12122"
-echo "  Подключение:    ssh super@<IP> -p 12122"
+echo -e "  ${BOLD}Remnanode:${NC}      cd /opt/remnanode"
+echo -e "  ${BOLD}Edit config:${NC}    nano /opt/remnanode/docker-compose.yml"
+echo -e "  ${BOLD}Start:${NC}          docker compose up -d"
 echo ""
-echo "  Remnanode:      cd /opt/remnanode"
-echo "  Редактировать:  nano /opt/remnanode/docker-compose.yml"
-echo "  Запуск:         docker compose -f /opt/remnanode/docker-compose.yml up -d"
+echo -e "  ${YELLOW}Don't forget to set SECRET_KEY in docker-compose.yml${NC}"
 echo ""
-echo "============================================"
