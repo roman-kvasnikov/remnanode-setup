@@ -116,12 +116,17 @@ step "Installing acme.sh"
 if [[ -f "$HOME/.acme.sh/acme.sh" ]]; then
     warn "acme.sh is already installed"
 else
-    curl -fsSL https://get.acme.sh | sh -s -- --install-online
+    curl -fsSL https://get.acme.sh | sh
     ok "acme.sh installed"
 fi
 
-# Make acme.sh available in current shell
-export PATH="$HOME/.acme.sh:$PATH"
+# Source acme.sh environment
+source "$HOME/.acme.sh/acme.sh.env" 2>/dev/null || true
+
+if [[ ! -f "$HOME/.acme.sh/acme.sh" ]]; then
+    error "acme.sh installation failed — binary not found"
+    exit 1
+fi
 
 # ── Step 5: Issue certificate ─────────────────────────────
 step "Issuing Let's Encrypt certificate for ${DOMAIN}"
