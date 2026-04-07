@@ -161,7 +161,7 @@ mkdir -p "$INSTALL_CERT_DIR"
 "$HOME/.acme.sh/acme.sh" --install-cert -d "$DOMAIN" --ecc \
     --fullchain-file "$INSTALL_CERT_DIR/fullchain.pem" \
     --key-file "$INSTALL_CERT_DIR/key.pem" \
-    --reloadcmd "systemctl reload nginx"
+    --reloadcmd "systemctl reload nginx || true"
 
 ok "Certificate installed to $INSTALL_CERT_DIR"
 
