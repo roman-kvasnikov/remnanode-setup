@@ -7,5 +7,5 @@ curl -fsSL https://raw.githubusercontent.com/roman-kvasnikov/remnanode-setup/mas
 ```
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/roman-kvasnikov/remnanode-setup/master/random-website-creation.sh -o ./random-website-creation.sh && sudo bash ./random-website-creation.sh
+curl -fsSL https://raw.githubusercontent.com/roman-kvasnikov/remnanode-setup/master/reality-camouflage-creation.sh -o ./reality-camouflage-creation.sh && sudo bash ./reality-camouflage-creation.sh
 ```
