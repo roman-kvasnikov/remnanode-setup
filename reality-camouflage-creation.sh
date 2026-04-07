@@ -139,6 +139,9 @@ info "Selected template: ${random_template}"
 mkdir -p "$WEB_ROOT"
 rm -rf "${WEB_ROOT:?}"/*
 cp -a "$REPO_DIR/$random_template/." "$WEB_ROOT/"
+chmod 755 "$WEB_ROOT"
+find "$WEB_ROOT" -type d -exec chmod 755 {} \;
+find "$WEB_ROOT" -type f -exec chmod 644 {} \;
 ok "Template deployed to $WEB_ROOT"
 
 # ── Step 5: Install acme.sh ───────────────────────────────
