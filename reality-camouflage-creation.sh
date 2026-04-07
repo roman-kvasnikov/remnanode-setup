@@ -10,8 +10,8 @@
 # Xray Reality forwards unauthenticated connections to this local nginx.
 #
 # Reality inbound config:
-#   "target": "127.0.0.1:7443"    (or "dest")
-#   "serverNames": ["sub.be-free.online"]
+#   "target": "127.0.0.1:7443"
+#   "serverNames": ["your.domain.com"]
 #
 # Port 80 is used temporarily by acme.sh for certificate issuance,
 # then stays free (or you can optionally enable the redirect block).
@@ -48,12 +48,12 @@ fi
 
 echo ""
 echo -e "${BOLD}${GREEN}╔════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}${GREEN}║   Steal-from-Yourself — Starting...        ║${NC}"
+echo -e "${BOLD}${GREEN}║      Steal-from-Yourself — Starting...     ║${NC}"
 echo -e "${BOLD}${GREEN}╚════════════════════════════════════════════╝${NC}"
 
 # ── Interactive input ──────────────────────────────────────
 echo ""
-read -rp "$(echo -e "${BOLD}Enter domain name (e.g. sub.be-free.online):${NC} ")" DOMAIN
+read -rp "$(echo -e "${BOLD}Enter domain name (e.g. your.domain.com):${NC} ")" DOMAIN
 
 if [[ -z "$DOMAIN" ]]; then
     error "Domain cannot be empty"
@@ -66,7 +66,7 @@ DOMAIN="${DOMAIN%%/*}"
 
 info "Domain: ${DOMAIN}"
 
-read -rp "$(echo -e "${BOLD}Enter email for Let's Encrypt (or press Enter to skip):${NC} ")" ACME_EMAIL
+read -rp "$(echo -e "${BOLD}Enter E-Mail for Let's Encrypt (or press Enter to skip):${NC} ")" ACME_EMAIL
 ACME_EMAIL="${ACME_EMAIL:-}"
 
 # Internal port where nginx listens (localhost only)
