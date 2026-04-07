@@ -86,7 +86,7 @@ NGINX_LINK="/etc/nginx/sites-enabled/${DOMAIN}"
 # ── Step 1: Firewall (open port 80 early for acme.sh) ─────
 step "Checking firewall"
 
-if command -v ufw &>/dev/null && ufw status | grep -q "active"; then
+if command -v ufw &>/dev/null && ufw status | grep -qw "active"; then
     ufw allow 80/tcp > /dev/null 2>&1
     ok "UFW: port 80 opened for certificate verification"
 else
