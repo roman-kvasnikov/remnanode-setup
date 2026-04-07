@@ -38,9 +38,9 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 echo ""
-echo -e "${BOLD}${GREEN}╔════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}${GREEN}║   Random Fake Website — Starting...        ║${NC}"
-echo -e "${BOLD}${GREEN}╚════════════════════════════════════════════╝${NC}"
+echo -e "${BOLD}${GREEN}╔═══════════════════════════════════════╗${NC}"
+echo -e "${BOLD}${GREEN}║   Random Fake Website — Starting...   ║${NC}"
+echo -e "${BOLD}${GREEN}╚═══════════════════════════════════════╝${NC}"
 
 REPO_DIR="$HOME/randomfakehtml-master"
 WEB_ROOT="/var/www/html"
