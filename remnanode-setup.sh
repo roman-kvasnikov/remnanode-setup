@@ -114,7 +114,7 @@ if wget -q -O "$GEO_DIR/geoip.dat.new" \
   mv "$GEO_DIR/ru-geoip.dat.new" "$GEO_DIR/ru-geoip.dat"
   mv "$GEO_DIR/ru-geosite.dat.new" "$GEO_DIR/ru-geosite.dat"
 
-  docker restart remnanode
+  docker restart remnanode 2>/dev/null || true
   echo "$(date): Update successful, container restarted" >> "$LOG_FILE"
 else
   # Download failed — clean up temp files
