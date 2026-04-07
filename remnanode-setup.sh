@@ -205,7 +205,7 @@ ok "Kernel parameters applied"
 # ── Summary ────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}${GREEN}╔════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}${GREEN}║           Setup complete!                   ║${NC}"
+echo -e "${BOLD}${GREEN}║           Setup complete!                  ║${NC}"
 echo -e "${BOLD}${GREEN}╚════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  ${BOLD}Remnanode:${NC}      cd /opt/remnanode"
