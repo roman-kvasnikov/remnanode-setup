@@ -179,9 +179,8 @@ server {
 
 # ── HTTPS on port 443 ─────────────────────────────────────
 server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    http2 on;
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
     server_name ${DOMAIN};
 
     ssl_certificate     ${INSTALL_CERT_DIR}/fullchain.pem;
@@ -210,9 +209,8 @@ server {
 
 # ── HTTPS on port 8443 (mirror) ───────────────────────────
 server {
-    listen 8443 ssl;
-    listen [::]:8443 ssl;
-    http2 on;
+    listen 8443 ssl http2;
+    listen [::]:8443 ssl http2;
     server_name ${DOMAIN};
 
     ssl_certificate     ${INSTALL_CERT_DIR}/fullchain.pem;
