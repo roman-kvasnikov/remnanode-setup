@@ -94,7 +94,7 @@ cat > /opt/remnanode/update-geo.sh << 'SCRIPT'
 #!/bin/bash
 
 GEO_DIR="/opt/remnanode"
-LOG_FILE="/var/log/xray-geo-update.log"
+LOG_FILE="/var/log/update-geo.log"
 
 echo "$(date): Starting geo update" >> "$LOG_FILE"
 
