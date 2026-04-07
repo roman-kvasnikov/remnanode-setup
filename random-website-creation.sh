@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
 #
-# ╔═════════════════════════════════════════════════════════╗
-# ║    Random Fake Website — Full Deployment                ║
-# ║                                                         ║
-# ║    Nginx · Let's Encrypt (acme.sh) · HTTPS on 443+8443  ║
-# ╚═════════════════════════════════════════════════════════╝
+# ╔══════════════════════════════════════════════════════════╗
+# ║    Steal-from-Yourself — Reality Camouflage Website      ║
+# ║                                                          ║
+# ║    Nginx (localhost) · Let's Encrypt · Reality target    ║
+# ╚══════════════════════════════════════════════════════════╝
 #
+# Nginx listens on 127.0.0.1:7443 (HTTPS) with a real LE certificate.
+# Xray Reality forwards unauthenticated connections to this local nginx.
+#
+# Reality inbound config:
+#   "target": "127.0.0.1:7443"    (or "dest")
+#   "serverNames": ["sub.be-free.online"]
+#
+# Port 80 is used temporarily by acme.sh for certificate issuance,
+# then stays free (or you can optionally enable the redirect block).
 
 set -euo pipefail
 
@@ -39,19 +48,18 @@ fi
 
 echo ""
 echo -e "${BOLD}${GREEN}╔════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}${GREEN}║   Random Fake Website — Full Deployment    ║${NC}"
+echo -e "${BOLD}${GREEN}║   Steal-from-Yourself — Starting...        ║${NC}"
 echo -e "${BOLD}${GREEN}╚════════════════════════════════════════════╝${NC}"
 
 # ── Interactive input ──────────────────────────────────────
 echo ""
-read -rp "$(echo -e "${BOLD}Enter domain name (e.g. site.example.com):${NC} ")" DOMAIN
+read -rp "$(echo -e "${BOLD}Enter domain name (e.g. sub.be-free.online):${NC} ")" DOMAIN
 
 if [[ -z "$DOMAIN" ]]; then
     error "Domain cannot be empty"
     exit 1
 fi
 
-# Strip protocol prefix if user pasted a URL
 DOMAIN="${DOMAIN#https://}"
 DOMAIN="${DOMAIN#http://}"
 DOMAIN="${DOMAIN%%/*}"
@@ -61,20 +69,43 @@ info "Domain: ${DOMAIN}"
 read -rp "$(echo -e "${BOLD}Enter email for Let's Encrypt (or press Enter to skip):${NC} ")" ACME_EMAIL
 ACME_EMAIL="${ACME_EMAIL:-}"
 
+# Internal port where nginx listens (localhost only)
+NGINX_PORT=7443
+
+read -rp "$(echo -e "${BOLD}Nginx internal HTTPS port [${NGINX_PORT}]:${NC} ")" CUSTOM_PORT
+NGINX_PORT="${CUSTOM_PORT:-$NGINX_PORT}"
+
+info "Nginx will listen on 127.0.0.1:${NGINX_PORT}"
+
 REPO_DIR="$HOME/randomfakehtml-master"
 WEB_ROOT="/var/www/${DOMAIN}"
-CERT_DIR="/root/.acme.sh/${DOMAIN}_ecc"
+INSTALL_CERT_DIR="/etc/ssl/${DOMAIN}"
 NGINX_CONF="/etc/nginx/sites-available/${DOMAIN}"
 NGINX_LINK="/etc/nginx/sites-enabled/${DOMAIN}"
 
-# ── Step 1: Dependencies ──────────────────────────────────
+# ── Step 1: Firewall (open port 80 early for acme.sh) ─────
+step "Checking firewall"
+
+if command -v ufw &>/dev/null && ufw status | grep -q "active"; then
+    ufw allow 80/tcp > /dev/null 2>&1
+    ok "UFW: port 80 opened for certificate verification"
+else
+    info "UFW not active, make sure port 80 is reachable for certificate issuance"
+fi
+
+# ── Step 2: Dependencies ──────────────────────────────────
 step "Installing dependencies"
 
 apt update -qq
 apt install -y -qq unzip wget curl socat nginx > /dev/null 2>&1
+
+# Stop nginx so it does not occupy port 80
+systemctl stop nginx 2>/dev/null || true
+systemctl disable nginx 2>/dev/null || true
+
 ok "nginx, unzip, wget, curl, socat installed"
 
-# ── Step 2: Download templates ────────────────────────────
+# ── Step 3: Download templates ────────────────────────────
 step "Preparing template repository"
 
 if [[ -d "$REPO_DIR" ]]; then
@@ -90,7 +121,7 @@ else
     ok "Templates downloaded and cleaned up"
 fi
 
-# ── Step 3: Deploy random template ────────────────────────
+# ── Step 4: Deploy random template ────────────────────────
 step "Deploying random template"
 
 cd "$REPO_DIR"
@@ -110,7 +141,7 @@ rm -rf "${WEB_ROOT:?}"/*
 cp -a "$REPO_DIR/$random_template/." "$WEB_ROOT/"
 ok "Template deployed to $WEB_ROOT"
 
-# ── Step 4: Install acme.sh ───────────────────────────────
+# ── Step 5: Install acme.sh ───────────────────────────────
 step "Installing acme.sh"
 
 if [[ -f "$HOME/.acme.sh/acme.sh" ]]; then
@@ -120,7 +151,6 @@ else
     ok "acme.sh installed"
 fi
 
-# Source acme.sh environment
 source "$HOME/.acme.sh/acme.sh.env" 2>/dev/null || true
 
 if [[ ! -f "$HOME/.acme.sh/acme.sh" ]]; then
@@ -128,34 +158,33 @@ if [[ ! -f "$HOME/.acme.sh/acme.sh" ]]; then
     exit 1
 fi
 
-# ── Step 5: Issue certificate ─────────────────────────────
+# ── Step 6: Issue certificate ─────────────────────────────
 step "Issuing Let's Encrypt certificate for ${DOMAIN}"
-
-# Stop nginx temporarily so acme.sh can use port 80 (standalone mode)
-systemctl stop nginx 2>/dev/null || true
 
 ACME_ARGS=(
     --issue
     -d "$DOMAIN"
     --standalone
     --keylength ec-256
-    --force
 )
 
 if [[ -n "$ACME_EMAIL" ]]; then
     ACME_ARGS+=(--accountemail "$ACME_EMAIL")
 fi
 
+# Only force re-issue if cert does not exist yet
+if [[ ! -f "$HOME/.acme.sh/${DOMAIN}_ecc/${DOMAIN}.cer" ]]; then
+    ACME_ARGS+=(--force)
+fi
+
 if "$HOME/.acme.sh/acme.sh" "${ACME_ARGS[@]}"; then
     ok "Certificate issued successfully"
 else
-    error "Certificate issuance failed. Make sure DNS for ${DOMAIN} points to this server"
-    systemctl start nginx 2>/dev/null || true
-    exit 1
+    warn "Certificate may already exist or issuance failed"
+    warn "Make sure DNS A-record for ${DOMAIN} points to this server"
 fi
 
 # Install certificate to a stable path
-INSTALL_CERT_DIR="/etc/ssl/${DOMAIN}"
 mkdir -p "$INSTALL_CERT_DIR"
 
 "$HOME/.acme.sh/acme.sh" --install-cert -d "$DOMAIN" --ecc \
@@ -165,22 +194,19 @@ mkdir -p "$INSTALL_CERT_DIR"
 
 ok "Certificate installed to $INSTALL_CERT_DIR"
 
-# ── Step 6: Configure nginx ───────────────────────────────
+# ── Step 7: Configure nginx ───────────────────────────────
 step "Configuring nginx"
 
 cat > "$NGINX_CONF" << NGINX
-# ── HTTP → HTTPS redirect ─────────────────────────────────
-server {
-    listen 80;
-    listen [::]:80;
-    server_name ${DOMAIN};
-    return 301 https://\$host\$request_uri;
-}
+# ╔═══════════════════════════════════════════════════════╗
+# ║  Steal-from-Yourself: Nginx for Reality target        ║
+# ║  Listens on 127.0.0.1:${NGINX_PORT} only (not public) ║
+# ╚═══════════════════════════════════════════════════════╝
 
-# ── HTTPS on port 443 ─────────────────────────────────────
+# ── Local HTTPS for Reality target ─────────────────────
 server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
+    listen 127.0.0.1:${NGINX_PORT} ssl;
+    http2 on;
     server_name ${DOMAIN};
 
     ssl_certificate     ${INSTALL_CERT_DIR}/fullchain.pem;
@@ -190,7 +216,7 @@ server {
     ssl_prefer_server_ciphers off;
     ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305;
 
-    ssl_session_cache   shared:SSL:10m;
+    ssl_session_cache   shared:REALITY:10m;
     ssl_session_timeout 1d;
     ssl_session_tickets off;
 
@@ -207,63 +233,47 @@ server {
     add_header Referrer-Policy "no-referrer-when-downgrade" always;
 }
 
-# ── HTTPS on port 8443 (mirror) ───────────────────────────
-server {
-    listen 8443 ssl http2;
-    listen [::]:8443 ssl http2;
-    server_name ${DOMAIN};
-
-    ssl_certificate     ${INSTALL_CERT_DIR}/fullchain.pem;
-    ssl_certificate_key ${INSTALL_CERT_DIR}/key.pem;
-
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_prefer_server_ciphers off;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305;
-
-    ssl_session_cache   shared:SSL_ALT:10m;
-    ssl_session_timeout 1d;
-    ssl_session_tickets off;
-
-    root ${WEB_ROOT};
-    index index.html index.htm;
-
-    location / {
-        try_files \$uri \$uri/ =404;
-    }
-
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header Referrer-Policy "no-referrer-when-downgrade" always;
-}
+# ── Optional: HTTP redirect to HTTPS (uncomment if needed) ──
+# Useful if you want the domain to work in a browser via port 80.
+# Note: port 80 must not conflict with other services.
+#
+# server {
+#     listen 80;
+#     listen [::]:80;
+#     server_name ${DOMAIN};
+#     return 301 https://\$host\$request_uri;
+# }
 NGINX
 
 ok "Nginx config created: $NGINX_CONF"
 
-# Enable site, disable default if present
+# Enable site, disable default
 ln -sf "$NGINX_CONF" "$NGINX_LINK"
 rm -f /etc/nginx/sites-enabled/default
 
-# Test and start
+# Handle older nginx without standalone "http2 on"
+if ! nginx -t 2>/dev/null; then
+    warn "nginx does not support 'http2 on' directive, falling back to listen-level http2"
+    sed -i 's/listen 127.0.0.1:'"${NGINX_PORT}"' ssl;/listen 127.0.0.1:'"${NGINX_PORT}"' ssl http2;/' "$NGINX_CONF"
+    sed -i '/^\s*http2 on;/d' "$NGINX_CONF"
+fi
+
 if nginx -t 2>/dev/null; then
     systemctl enable nginx
     systemctl restart nginx
-    ok "Nginx is running"
+    ok "Nginx is running on 127.0.0.1:${NGINX_PORT}"
 else
     error "Nginx configuration test failed:"
     nginx -t
     exit 1
 fi
 
-# ── Step 7: Firewall ──────────────────────────────────────
-step "Checking firewall"
-
-if command -v ufw &>/dev/null && ufw status | grep -q "active"; then
-    ufw allow 80/tcp   > /dev/null 2>&1
-    ufw allow 443/tcp  > /dev/null 2>&1
-    ufw allow 8443/tcp > /dev/null 2>&1
-    ok "UFW rules added for ports 80, 443, 8443"
+# Verify nginx is actually listening
+sleep 1
+if ss -tlnp | grep -q ":${NGINX_PORT}"; then
+    ok "Confirmed: nginx listening on 127.0.0.1:${NGINX_PORT}"
 else
-    info "UFW not active, skipping (make sure ports 80, 443, 8443 are open)"
+    warn "Could not confirm nginx is listening — check manually"
 fi
 
 # ── Summary ────────────────────────────────────────────────
@@ -272,17 +282,20 @@ echo -e "${BOLD}${GREEN}╔═════════════════�
 echo -e "${BOLD}${GREEN}║           Deployment complete!             ║${NC}"
 echo -e "${BOLD}${GREEN}╚════════════════════════════════════════════╝${NC}"
 echo ""
-echo -e "  ${BOLD}Domain:${NC}       ${DOMAIN}"
-echo -e "  ${BOLD}Template:${NC}     ${random_template}"
-echo -e "  ${BOLD}Web root:${NC}     ${WEB_ROOT}"
-echo -e "  ${BOLD}Certificate:${NC}  ${INSTALL_CERT_DIR}/"
-echo -e "  ${BOLD}Nginx config:${NC} ${NGINX_CONF}"
+echo -e "  ${BOLD}Domain:${NC}         ${DOMAIN}"
+echo -e "  ${BOLD}Template:${NC}       ${random_template}"
+echo -e "  ${BOLD}Web root:${NC}       ${WEB_ROOT}"
+echo -e "  ${BOLD}Certificate:${NC}    ${INSTALL_CERT_DIR}/"
+echo -e "  ${BOLD}Nginx config:${NC}   ${NGINX_CONF}"
+echo -e "  ${BOLD}Nginx address:${NC}  127.0.0.1:${NGINX_PORT}"
 echo ""
-echo -e "  ${BOLD}URLs:${NC}"
-echo -e "    ${CYAN}https://${DOMAIN}${NC}       (port 443)"
-echo -e "    ${CYAN}https://${DOMAIN}:8443${NC}  (port 8443)"
-echo -e "    ${CYAN}http://${DOMAIN}${NC}        (redirects to HTTPS)"
+echo -e "  ${BOLD}${CYAN}Reality inbound settings:${NC}"
+echo -e "    \"target\":      \"127.0.0.1:${NGINX_PORT}\""
+echo -e "    \"serverNames\": [\"${DOMAIN}\"]"
 echo ""
-echo -e "  ${BOLD}Re-randomize:${NC} bash $0  (new template, same cert)"
-echo -e "  ${BOLD}Cert renewal:${NC} automatic via acme.sh cron"
+echo -e "  ${BOLD}Verify locally:${NC}"
+echo -e "    curl -k https://127.0.0.1:${NGINX_PORT} --resolve ${DOMAIN}:${NGINX_PORT}:127.0.0.1"
+echo ""
+echo -e "  ${BOLD}Re-randomize:${NC}   bash $0  (picks new template, keeps cert)"
+echo -e "  ${BOLD}Cert renewal:${NC}   automatic via acme.sh cron"
 echo ""
