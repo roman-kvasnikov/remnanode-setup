@@ -98,9 +98,9 @@ ok "Template deployed to $WEB_ROOT"
 
 # ── Summary ────────────────────────────────────────────────
 echo ""
-echo -e "${BOLD}${GREEN}╔════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}${GREEN}║           Deployment complete!              ║${NC}"
-echo -e "${BOLD}${GREEN}╚════════════════════════════════════════════╝${NC}"
+echo -e "${BOLD}${GREEN}╔═══════════════════════════════════════╗${NC}"
+echo -e "${BOLD}${GREEN}║           Deployment complete!        ║${NC}"
+echo -e "${BOLD}${GREEN}╚═══════════════════════════════════════╝${NC}"
 echo ""
 echo -e "  ${BOLD}Template:${NC}    ${random_template}"
 echo -e "  ${BOLD}Web root:${NC}    ${WEB_ROOT}"
