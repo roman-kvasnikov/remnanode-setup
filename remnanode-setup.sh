@@ -81,8 +81,8 @@ services:
       - ./geosite.dat:/usr/local/share/xray/geosite.dat:ro
       - ./ru-geoip.dat:/usr/local/share/xray/ru-geoip.dat:ro
       - ./ru-geosite.dat:/usr/local/share/xray/ru-geosite.dat:ro
-      # - ./certs/cert.crt:/etc/xray/certs/cert.crt:ro
-      # - ./certs/key.key:/etc/xray/certs/key.key:ro
+      # - /etc/ssl/domain.com/fullchain.pem:/etc/xray/certs/cert.crt:ro
+      # - /etc/ssl/domain.com/key.pem:/etc/xray/certs/key.key:ro
 EOF
 
 ok "docker-compose.yml created"
