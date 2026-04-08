@@ -195,8 +195,8 @@ mkdir -p "$INSTALL_CERT_DIR"
     --key-file "$INSTALL_CERT_DIR/key.pem" \
     --reloadcmd "systemctl reload nginx || true"
 
-chmod 644 $INSTALL_CERT_DIR/fullchain.pem
-chmod 600 $INSTALL_CERT_DIR/key.pem
+chmod 644 "$INSTALL_CERT_DIR/fullchain.pem"
+chmod 600 "$INSTALL_CERT_DIR/key.pem"
 
 ok "Certificate installed to $INSTALL_CERT_DIR"
 
