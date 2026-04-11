@@ -127,8 +127,9 @@ chmod +x /opt/remnanode/update-geo.sh
 ok "update-geo.sh created"
 
 # Add to cron (daily at 04:00)
-CRON_JOB="0 4 * * * /opt/remnanode/update-geo.sh"
-(crontab -l 2>/dev/null | grep -v "update-geo.sh"; echo "$CRON_JOB") | crontab -
+EXISTING_CRON=$(crontab -l 2>/dev/null || true)
+FILTERED=$(echo "$EXISTING_CRON" | grep -v "update-geo.sh" || true)
+echo "${FILTERED:+$FILTERED}0 4 * * * /opt/remnanode/update-geo.sh" | crontab -
 ok "Cron job added (daily at 04:00)"
 
 # First run
