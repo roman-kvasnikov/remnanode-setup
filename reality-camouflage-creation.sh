@@ -169,6 +169,7 @@ ACME_ARGS=(
     -d "$DOMAIN"
     --standalone
     --keylength ec-256
+    --server letsencrypt
 )
 
 if [[ -n "$ACME_EMAIL" ]]; then
