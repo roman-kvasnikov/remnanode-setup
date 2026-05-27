@@ -244,12 +244,12 @@ server {
 # Useful if you want the domain to work in a browser via port 80.
 # Note: port 80 must not conflict with other services.
 #
-# server {
-#     listen 80;
-#     listen [::]:80;
-#     server_name ${DOMAIN};
-#     return 301 https://\$host\$request_uri;
-# }
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
 NGINX
 
 ok "Nginx config created: $NGINX_CONF"
