@@ -97,13 +97,13 @@ fi
 step "Installing dependencies"
 
 apt update -qq
-apt install -y -qq unzip wget curl socat nginx > /dev/null 2>&1
+apt install -y -qq unzip wget curl cron socat nginx > /dev/null 2>&1
 
 # Stop nginx so it does not occupy port 80
 systemctl stop nginx 2>/dev/null || true
 systemctl disable nginx 2>/dev/null || true
 
-ok "nginx, unzip, wget, curl, socat installed"
+ok "nginx, unzip, wget, curl, cron, socat installed"
 
 # ── Step 3: Download templates ────────────────────────────
 step "Preparing template repository"
