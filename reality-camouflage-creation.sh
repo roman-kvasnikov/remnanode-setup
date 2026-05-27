@@ -210,6 +210,14 @@ cat > "$NGINX_CONF" << NGINX
 # ║  Listens on 127.0.0.1:${NGINX_PORT} only (not public) ║
 # ╚═══════════════════════════════════════════════════════╝
 
+# ── HTTP -> HTTPS Redirect ─────────────────────────────
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN};
+    return 301 https://\$host\$request_uri;
+}
+
 # ── Local HTTPS for Reality target ─────────────────────
 server {
     listen 127.0.0.1:${NGINX_PORT} ssl;
@@ -238,17 +246,6 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header Referrer-Policy "no-referrer-when-downgrade" always;
-}
-
-# ── Optional: HTTP redirect to HTTPS (uncomment if needed) ──
-# Useful if you want the domain to work in a browser via port 80.
-# Note: port 80 must not conflict with other services.
-
-server {
-    listen 80;
-    listen [::]:80;
-    server_name ${DOMAIN};
-    return 301 https://\$host\$request_uri;
 }
 NGINX
 
