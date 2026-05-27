@@ -243,7 +243,7 @@ server {
 # ── Optional: HTTP redirect to HTTPS (uncomment if needed) ──
 # Useful if you want the domain to work in a browser via port 80.
 # Note: port 80 must not conflict with other services.
-#
+
 server {
     listen 80;
     listen [::]:80;
