@@ -77,6 +77,7 @@ services:
       - SECRET_KEY=""
     volumes:
       # - /dev/shm:/dev/shm:rw
+      - /var/log/remnanode:/var/log/remnanode:rw
       - ./geoip.dat:/usr/local/share/xray/geoip.dat:ro
       - ./geosite.dat:/usr/local/share/xray/geosite.dat:ro
       - ./ru-geoip.dat:/usr/local/share/xray/ru-geoip.dat:ro
