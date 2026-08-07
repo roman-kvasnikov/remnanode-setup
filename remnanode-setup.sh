@@ -88,7 +88,27 @@ EOF
 
 ok "docker-compose.yml created"
 
-# ── Step 3: Geo database update script & cron ──────────────
+# ── Step 3: Configuring logrotate ──────────────────────────
+
+step "Configuring logrotate"
+
+apt update -y
+apt install logrotate -y
+
+cat > /etc/logrotate.d/remnanode << 'EOF'
+/var/log/remnanode/*.log {
+      size 50M
+      rotate 5
+      compress
+      missingok
+      notifempty
+      copytruncate
+  }
+EOF
+
+logrotate -vf /etc/logrotate.d/remnanode
+
+# ── Step 4: Geo database update script & cron ──────────────
 step "Configuring geo database updates"
 
 cat > /opt/remnanode/update-geo.sh << 'SCRIPT'
@@ -138,7 +158,7 @@ info "Downloading geo databases (initial run)..."
 /opt/remnanode/update-geo.sh
 ok "Geo databases downloaded"
 
-# ── Step 4: Kernel tuning ─────────────────────────────────
+# ── Step 5: Kernel tuning ─────────────────────────────────
 step "Applying kernel parameters"
 
 cat > /etc/sysctl.d/99-optimal-vless.conf << 'EOF'
