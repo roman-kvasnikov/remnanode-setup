@@ -150,7 +150,8 @@ ok "update-geo.sh created"
 # Add to cron (daily at 04:00)
 EXISTING_CRON=$(crontab -l 2>/dev/null || true)
 FILTERED=$(echo "$EXISTING_CRON" | grep -v "update-geo.sh" || true)
-echo "${FILTERED:+$FILTERED}0 4 * * * /opt/remnanode/update-geo.sh" | crontab -
+echo "${FILTERED:+$FILTERED
+}0 4 * * * /opt/remnanode/update-geo.sh" | crontab -
 ok "Cron job added (daily at 04:00)"
 
 # First run
