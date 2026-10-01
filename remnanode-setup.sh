@@ -92,7 +92,7 @@ ok "docker-compose.yml created"
 step "Configuring logrotate"
 
 export DEBIAN_FRONTEND=noninteractive
-apt-get update
+apt-get update -qq
 apt-get install -y logrotate
 
 cat > /etc/logrotate.d/remnanode << 'EOF'
