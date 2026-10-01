@@ -58,6 +58,9 @@ step "Setting up Remnanode"
 mkdir -p /opt/remnanode
 info "Created /opt/remnanode"
 
+mkdir -p /var/log/remnanode
+info "Created /var/log/remnanode"
+
 cat > /opt/remnanode/docker-compose.yml << 'EOF'
 services:
   remnanode:
@@ -74,7 +77,7 @@ services:
         hard: 1048576
     environment:
       - NODE_PORT=2222
-      - SECRET_KEY=""
+      - SECRET_KEY="..."
     volumes:
       # - /dev/shm:/dev/shm:rw
       - /var/log/remnanode:/var/log/remnanode:rw
@@ -88,8 +91,8 @@ ok "docker-compose.yml created"
 
 step "Configuring logrotate"
 
-apt update -y
-apt install logrotate -y
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y logrotate
 
 cat > /etc/logrotate.d/remnanode << 'EOF'
 /var/log/remnanode/*.log {
@@ -99,10 +102,10 @@ cat > /etc/logrotate.d/remnanode << 'EOF'
       missingok
       notifempty
       copytruncate
-  }
+}
 EOF
 
-logrotate -vf /etc/logrotate.d/remnanode
+logrotate -d /etc/logrotate.d/remnanode
 
 # ── Step 4: Kernel tuning ─────────────────────────────────
 step "Applying kernel parameters"
@@ -118,7 +121,7 @@ net.ipv4.tcp_moderate_rcvbuf = 1
 net.ipv4.tcp_congestion_control = bbr
 net.core.default_qdisc = fq
 
-# ---- 4MB TCP Buffers = stable up to ~500 Mbps ----
+# ---- 16MB TCP Buffers = stable up to ~500 Mbps ----
 net.core.rmem_max = 16777216
 net.core.wmem_max = 16777216
 net.ipv4.tcp_rmem = 4096 262144 16777216
