@@ -77,7 +77,7 @@ services:
         hard: 1048576
     environment:
       - NODE_PORT=2222
-      - SECRET_KEY="..."
+      - SECRET_KEY=
     volumes:
       # - /dev/shm:/dev/shm:rw
       - /var/log/remnanode:/var/log/remnanode:rw
@@ -105,7 +105,7 @@ cat > /etc/logrotate.d/remnanode << 'EOF'
 }
 EOF
 
-logrotate -d /etc/logrotate.d/remnanode
+logrotate -d /etc/logrotate.d/remnanode > /dev/null 2>&1
 
 # ── Step 4: Kernel tuning ─────────────────────────────────
 step "Applying kernel parameters"
@@ -133,16 +133,8 @@ net.ipv4.tcp_fastopen = 3
 # ---- Latency & stability improvements ----
 net.ipv4.tcp_slow_start_after_idle = 0
 # net.ipv4.tcp_notsent_lowat = 16384
-net.ipv4.tcp_mtu_probing = 2
+net.ipv4.tcp_mtu_probing = 1
 net.ipv4.tcp_ecn = 1
-
-# ---- TIME-WAIT (optimal for 5-10 VLESS clients) ----
-net.ipv4.tcp_max_tw_buckets = 20000
-
-# ---- Queues (best for 1 CPU, low jitter) ----
-net.core.somaxconn = 1024
-net.ipv4.tcp_max_syn_backlog = 2048
-net.core.netdev_max_backlog = 2000
 
 # ---- Keepalive for long VLESS connections ----
 net.ipv4.tcp_keepalive_time = 600
@@ -170,8 +162,15 @@ vm.vfs_cache_pressure = 50
 vm.max_map_count = 262144
 EOF
 
-sysctl --system > /dev/null 2>&1
-ok "Kernel parameters applied"
+modprobe tcp_bbr 2>/dev/null || true
+echo tcp_bbr > /etc/modules-load.d/bbr.conf
+
+sysctl --system > /dev/null
+if [[ $(sysctl -n net.ipv4.tcp_congestion_control) == bbr ]]; then
+   ok "Kernel parameters applied (BBR active)"
+else
+   warn "Kernel parameters applied, but BBR is NOT active"
+fi
 
 # ── Summary ────────────────────────────────────────────────
 echo ""
