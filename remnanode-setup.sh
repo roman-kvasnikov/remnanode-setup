@@ -106,9 +106,9 @@ cat > /etc/logrotate.d/remnanode << 'EOF'
 EOF
 
 if logrotate -d /etc/logrotate.d/remnanode > /dev/null 2>&1; then
-   ok "Logrotate configured"
+   ok "Logrotate configuration is valid"
 else
-   warn "Logrotate config check failed"
+   warn "Logrotate configuration check failed"
 fi
 
 # ── Step 4: Kernel tuning ─────────────────────────────────
@@ -136,7 +136,6 @@ net.ipv4.tcp_fastopen = 3
 net.ipv4.tcp_slow_start_after_idle = 0
 # net.ipv4.tcp_notsent_lowat = 16384
 net.ipv4.tcp_mtu_probing = 1
-net.ipv4.tcp_ecn = 1
 
 # ---- Keepalive for long VLESS connections ----
 net.ipv4.tcp_keepalive_time = 600
@@ -145,8 +144,8 @@ net.ipv4.tcp_keepalive_intvl = 30
 
 # ---- Security ----
 net.ipv4.tcp_syncookies = 1
-net.ipv4.conf.all.rp_filter = 1
-net.ipv4.conf.default.rp_filter = 1
+net.ipv4.conf.all.rp_filter = 2
+net.ipv4.conf.default.rp_filter = 2
 net.ipv4.conf.all.accept_redirects = 0
 net.ipv4.conf.default.accept_redirects = 0
 net.ipv4.conf.all.send_redirects = 0
