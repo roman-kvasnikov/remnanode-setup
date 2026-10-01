@@ -3,7 +3,7 @@
 # ╔══════════════════════════════════════════════════════════╗
 # ║     Ubuntu VPS Initial Setup — Remnanode Deployment      ║
 # ║                                                          ║
-# ║         Docker · Geo databases · Kernel tuning           ║
+# ║                  Docker · Kernel tuning                  ║
 # ╚══════════════════════════════════════════════════════════╝
 #
 
@@ -78,10 +78,6 @@ services:
     volumes:
       # - /dev/shm:/dev/shm:rw
       - /var/log/remnanode:/var/log/remnanode:rw
-      - ./geoip.dat:/usr/local/share/xray/geoip.dat:ro
-      - ./geosite.dat:/usr/local/share/xray/geosite.dat:ro
-      - ./ru-geoip.dat:/usr/local/share/xray/ru-geoip.dat:ro
-      - ./ru-geosite.dat:/usr/local/share/xray/ru-geosite.dat:ro
       # - /etc/ssl/domain.com/fullchain.pem:/etc/xray/certs/cert.crt:ro
       # - /etc/ssl/domain.com/key.pem:/etc/xray/certs/key.key:ro
 EOF
@@ -108,58 +104,7 @@ EOF
 
 logrotate -vf /etc/logrotate.d/remnanode
 
-# ── Step 4: Geo database update script & cron ──────────────
-step "Configuring geo database updates"
-
-cat > /opt/remnanode/update-geo.sh << 'SCRIPT'
-#!/bin/bash
-
-GEO_DIR="/opt/remnanode"
-LOG_FILE="/var/log/update-geo.log"
-
-echo "$(date): Starting geo update" >> "$LOG_FILE"
-
-# Download all files to temporary names first
-if wget -q -O "$GEO_DIR/geoip.dat.new" \
-     https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat && \
-   wget -q -O "$GEO_DIR/geosite.dat.new" \
-     https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat && \
-   wget -q -O "$GEO_DIR/ru-geoip.dat.new" \
-     https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geoip.dat && \
-   wget -q -O "$GEO_DIR/ru-geosite.dat.new" \
-     https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geosite.dat; then
-
-  # All downloaded — atomic swap
-  mv "$GEO_DIR/geoip.dat.new" "$GEO_DIR/geoip.dat"
-  mv "$GEO_DIR/geosite.dat.new" "$GEO_DIR/geosite.dat"
-  mv "$GEO_DIR/ru-geoip.dat.new" "$GEO_DIR/ru-geoip.dat"
-  mv "$GEO_DIR/ru-geosite.dat.new" "$GEO_DIR/ru-geosite.dat"
-
-  docker restart remnanode 2>/dev/null || true
-  echo "$(date): Update successful, container restarted" >> "$LOG_FILE"
-else
-  # Download failed — clean up temp files
-  rm -f "$GEO_DIR"/*.new
-  echo "$(date): Download failed, no changes made" >> "$LOG_FILE"
-fi
-SCRIPT
-
-chmod +x /opt/remnanode/update-geo.sh
-ok "update-geo.sh created"
-
-# Add to cron (daily at 04:00)
-EXISTING_CRON=$(crontab -l 2>/dev/null || true)
-FILTERED=$(echo "$EXISTING_CRON" | grep -v "update-geo.sh" || true)
-echo "${FILTERED:+$FILTERED
-}0 4 * * * /opt/remnanode/update-geo.sh" | crontab -
-ok "Cron job added (daily at 04:00)"
-
-# First run
-info "Downloading geo databases (initial run)..."
-/opt/remnanode/update-geo.sh
-ok "Geo databases downloaded"
-
-# ── Step 5: Kernel tuning ─────────────────────────────────
+# ── Step 4: Kernel tuning ─────────────────────────────────
 step "Applying kernel parameters"
 
 cat > /etc/sysctl.d/99-optimal-vless.conf << 'EOF'
