@@ -91,7 +91,7 @@ ok "docker-compose.yml created"
 
 step "Configuring logrotate"
 
-DEBIAN_FRONTEND=noninteractive
+export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y logrotate
 
@@ -107,9 +107,9 @@ cat > /etc/logrotate.d/remnanode << 'EOF'
 EOF
 
 if logrotate -d /etc/logrotate.d/remnanode > /dev/null 2>&1; then
-   ok "Logrotate configuration is valid"
+    ok "Logrotate configuration is valid"
 else
-   warn "Logrotate configuration check failed"
+    warn "Logrotate configuration check failed"
 fi
 
 # ── Step 4: Kernel tuning ─────────────────────────────────
