@@ -105,14 +105,16 @@ cat > /etc/logrotate.d/remnanode << 'EOF'
 }
 EOF
 
-logrotate -d /etc/logrotate.d/remnanode > /dev/null 2>&1
+if logrotate -d /etc/logrotate.d/remnanode > /dev/null 2>&1; then
+   ok "Logrotate configured"
+else
+   warn "Logrotate config check failed"
+fi
 
 # ── Step 4: Kernel tuning ─────────────────────────────────
 step "Applying kernel parameters"
 
 cat > /etc/sysctl.d/99-optimal-vless.conf << 'EOF'
-# ===== OPTIMAL VLESS SERVER CONFIG =====
-
 fs.file-max=2097152
 net.ipv4.tcp_window_scaling = 1
 net.ipv4.tcp_moderate_rcvbuf = 1
@@ -165,11 +167,11 @@ EOF
 modprobe tcp_bbr 2>/dev/null || true
 echo tcp_bbr > /etc/modules-load.d/bbr.conf
 
-sysctl --system > /dev/null
+sysctl --system > /dev/null || warn "Some sysctl keys were not applied (see errors above)"
 if [[ $(sysctl -n net.ipv4.tcp_congestion_control) == bbr ]]; then
-   ok "Kernel parameters applied (BBR active)"
+    ok "Kernel parameters applied (BBR active)"
 else
-   warn "Kernel parameters applied, but BBR is NOT active"
+    warn "Kernel parameters applied, but BBR is NOT active"
 fi
 
 # ── Summary ────────────────────────────────────────────────
