@@ -61,6 +61,10 @@ valid_port() { [[ "$1" =~ ^[0-9]+$ ]] && (( $1 >= 1 && $1 <= 65535 )); }
 export HOME=/root
 unset SUDO_USER SUDO_UID SUDO_GID SUDO_COMMAND
 
+# A restrictive root umask (027/077) would make files created by acme.sh in the
+# webroot unreadable for nginx (www-data) and the ACME challenge would get 403.
+umask 022
+
 valid_port "$NGINX_PORT" || die "Invalid NGINX_PORT: $NGINX_PORT"
 valid_port "$NODE_PORT"  || die "Invalid NODE_PORT: $NODE_PORT"
 [[ "$NGINX_PORT" != "$NODE_PORT" ]] || die "NGINX_PORT and NODE_PORT must differ"
@@ -262,7 +266,8 @@ EOF
 step "Issuing Let's Encrypt certificate for ${DOMAIN}"
 
 # Stage 1: HTTP-only config so nginx can serve the ACME challenge.
-mkdir -p "$ACME_ROOT"
+mkdir -p "$ACME_ROOT/.well-known/acme-challenge"
+chmod -R u=rwX,go=rX "$ACME_ROOT"
 render_nginx_conf no
 ln -sf "$NGINX_CONF" "$NGINX_LINK"
 rm -f /etc/nginx/sites-enabled/default
@@ -278,6 +283,16 @@ if [[ ! -x "$ACME" ]]; then
     ok "acme.sh installed"
 else
     ok "acme.sh already installed"
+fi
+
+# Renewals run from cron and must also write challenge files readable by nginx.
+if crontab -l 2>/dev/null | grep -q 'acme.sh --cron'; then
+    { crontab -l 2>/dev/null || true; } \
+        | sed '/acme.sh --cron/{/umask 022;/!s|"/root/.acme.sh"/acme.sh --cron|umask 022; &|}' \
+        | crontab -
+    ok "acme.sh cron job runs with umask 022"
+else
+    warn "acme.sh cron job not found — automatic renewal is not scheduled"
 fi
 
 # Re-issue if the existing cert was obtained in another mode (e.g. standalone),
