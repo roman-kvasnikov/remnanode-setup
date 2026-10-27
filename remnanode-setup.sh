@@ -317,7 +317,7 @@ mkdir -p "$CERT_DIR"
 "$ACME" --install-cert -d "$DOMAIN" --ecc \
     --fullchain-file "$CERT_DIR/fullchain.pem" \
     --key-file "$CERT_DIR/key.pem" \
-    --reloadcmd "systemctl reload nginx"
+    --reloadcmd "systemctl reload nginx; docker restart remnanode >/dev/null 2>&1 || true"
 chmod 644 "$CERT_DIR/fullchain.pem"
 chmod 600 "$CERT_DIR/key.pem"
 ok "Certificate installed to ${CERT_DIR}"
@@ -366,9 +366,9 @@ services:
     env_file: .env
     volumes:
       - ${NODE_LOG_DIR}:${NODE_LOG_DIR}:rw
-      # Uncomment for TLS inbounds that need the certificate:
-      # - ${CERT_DIR}/fullchain.pem:/etc/xray/certs/cert.crt:ro
-      # - ${CERT_DIR}/key.pem:/etc/xray/certs/key.key:ro
+      # Certificate for TLS inbounds (e.g. Hysteria2)
+      - ${CERT_DIR}/fullchain.pem:/etc/xray/certs/cert.crt:ro
+      - ${CERT_DIR}/key.pem:/etc/xray/certs/key.key:ro
 EOF
 ok "docker-compose.yml and .env written to ${NODE_DIR}"
 
