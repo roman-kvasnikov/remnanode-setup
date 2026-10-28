@@ -27,6 +27,8 @@ ACME_ROOT="/var/www/acme"
 NODE_DIR="/opt/remnanode"
 NODE_LOG_DIR="/var/log/remnanode"
 SYSCTL_CONF="/etc/sysctl.d/99-optimal-vless.conf"
+SWAP_FILE="/swapfile"
+SWAP_SIZE_MB=1024
 
 # ── Colors & helpers ───────────────────────────────────────
 RED='\033[0;31m'
@@ -76,6 +78,10 @@ echo -e "${BOLD}${GREEN}╚═════════════════�
 
 # ── Interactive input (everything asked up front) ─────────
 echo ""
+read -rp "$(echo -e "${BOLD}Add 1 GB swap file? [y/N]:${NC} ")" ADD_SWAP
+[[ "${ADD_SWAP,,}" =~ ^y(es)?$ ]] && ADD_SWAP=yes || ADD_SWAP=no
+[[ "$ADD_SWAP" == yes ]] && step_total=$((step_total + 1))
+
 read -rp "$(echo -e "${BOLD}Domain name (e.g. your.domain.com):${NC} ")" DOMAIN
 DOMAIN="${DOMAIN#http://}"
 DOMAIN="${DOMAIN#https://}"
@@ -98,6 +104,34 @@ ACME_DOMAIN_CONF="/root/.acme.sh/${DOMAIN}_ecc/${DOMAIN}.conf"
 info "Domain:       ${DOMAIN}"
 info "Nginx (TLS):  127.0.0.1:${NGINX_PORT}"
 info "Node port:    ${NODE_PORT}"
+info "Swap:         ${ADD_SWAP}"
+
+# ── Step 0 (optional): Swap ───────────────────────────────
+# Created first so apt and docker pulls on 1 GB RAM hosts do not hit OOM.
+if [[ "$ADD_SWAP" == yes ]]; then
+    step "Creating 1 GB swap file"
+
+    if swapon --show=NAME --noheadings | grep -qx "$SWAP_FILE"; then
+        ok "${SWAP_FILE} is already active, skipping"
+    elif [[ -n "$(swapon --show=NAME --noheadings)" ]]; then
+        warn "Swap already present: $(swapon --show=NAME --noheadings | paste -sd ' '), skipping"
+    else
+        # dd instead of fallocate: preallocated blocks work as swap on any filesystem.
+        rm -f "$SWAP_FILE"
+        dd if=/dev/zero of="$SWAP_FILE" bs=1M count="$SWAP_SIZE_MB" status=none
+        chmod 600 "$SWAP_FILE"
+        mkswap "$SWAP_FILE" > /dev/null
+
+        if swapon "$SWAP_FILE" 2>/dev/null; then
+            grep -qE "^${SWAP_FILE}[[:space:]]" /etc/fstab \
+                || echo "${SWAP_FILE} none swap sw 0 0" >> /etc/fstab
+            ok "Swap enabled: $(swapon --show=NAME,SIZE --noheadings | paste -sd ' ')"
+        else
+            rm -f "$SWAP_FILE"
+            warn "swapon failed (container-based VPS?), continuing without swap"
+        fi
+    fi
+fi
 
 # ── Step 1: Packages ──────────────────────────────────────
 step "Installing packages"
